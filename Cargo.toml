@@ -1,0 +1,10 @@
+[package]
+name = "ising1d"
+version = "0.1.0"
+edition = "2021"
+author = "Brendan Abolins <b.abolins@gmail.com>"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.5"
