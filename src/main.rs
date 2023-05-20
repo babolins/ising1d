@@ -1,10 +1,6 @@
-use std::fs;
-use std::path::PathBuf;
-use std::error::Error;
-use std::str::FromStr;
 use clap::Parser;
-use rand::Rng;
-use rand::distributions::Standard;
+use rand::{distributions::Standard, Rng};
+use std::{error::Error, fs, path::PathBuf, str::FromStr};
 use serde::Deserialize;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -15,6 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let j_beta = config.coupling / config.beta;
     let h_beta = config.field / config.beta;
     
+    // Spin state of the system, the value 1 = spin up, and the value -1 = spin down.
     let mut z = vec![1; config.sites];
     for _ in 0..config.init_iters {
         gibbs_sample(&mut z, j_beta, h_beta, config.sites);
@@ -28,12 +25,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         gibbs_sample(&mut z, j_beta, h_beta, config.sites);
 
         if i % config.sample_freq == 0 {
+            // Compute the magnetization of the system and update the mean and variance.
             count += 1;
             let m = z.iter().sum::<i32>() as f64;
             let delta = m - mean;
             mean += delta / count as f64;
             variance += delta * (m - mean);
 
+            // Compute the inter-site correlation and update its average value.
             let temp_corr = correlation(&z, config.sites);
             for i in 0..config.sites / 2 {
                 let delta = temp_corr[i] - corr[i];
@@ -56,32 +55,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Update the state of the system using Gibbs sampling.
 fn gibbs_sample(z: &mut Vec<i32>, j_beta: f64, h_beta: f64, sites: usize) {
-    let arg = z[sites - 1] + z[1];
-    let arg = j_beta * arg as f64 + h_beta;
-    let p = prob(arg);
+    let p = prob(z[sites - 1], z[1], j_beta, h_beta);
     let u: f64 = rand::thread_rng().sample(Standard);
     z[0] = if u < p { 1 } else { -1 };
 
     for i in 1..sites - 1 {
-        let arg = z[i - 1] + z[i + 1];
-        let arg = j_beta * arg as f64 + h_beta;
-        let p = prob(arg);
+        let p = prob(z[i - 1], z[i + 1], j_beta, h_beta);
         let u: f64 = rand::thread_rng().sample(Standard);
         z[i] = if u < p { 1 } else { -1 };
     }
 
-    let arg = z[sites - 2] + z[0];
-    let arg = j_beta * arg as f64 + h_beta;
-    let p = prob(arg);
+    let p = prob(z[sites - 2], z[0], j_beta, h_beta);
     let u: f64 = rand::thread_rng().sample(Standard);
     z[sites - 1] = if u < p { 1 } else { -1 };
 }
 
-fn prob(arg: f64) -> f64 {
+/// The probability that a spin is in the spin up state, conditional on the state of its neighbors.
+fn prob(z_m: i32, z_p: i32, j_beta: f64, h_beta: f64) -> f64 {
+    let arg = z_m + z_p;
+    let arg = j_beta * arg as f64 + h_beta;
     arg.exp() / (2.0 * arg.cosh())
 }
 
+/// Compute the expectation value of the inter-site correlation z[i] * z[j] as a function of inter-site
+/// distance |i - j| for distances up to half the size of the periodic box.
 fn correlation(z: &Vec<i32>, sites: usize) -> Vec<f64> {
     let mut corr: Vec<f64> = Vec::with_capacity(sites / 2);
     let m2 = z.iter().map(|z| (z * z) as f64).sum::<f64>();
