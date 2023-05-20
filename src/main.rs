@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("observations = {count}, M = {mean}, std. dev. = {}", variance.sqrt());
     
-    let mut corr_string = "".to_owned();
+    let mut corr_string = String::new();
     for (i, value) in corr.iter().enumerate() {
         corr_string.push_str(&format!("{i:>6} {value:>15.7E}\n"));
     }
