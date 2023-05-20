@@ -3,8 +3,12 @@ name = "ising1d"
 version = "0.1.0"
 edition = "2021"
 author = "Brendan Abolins <b.abolins@gmail.com>"
+description = "Simulate the 1-dimensional Ising model with periodic boundary conditions using Gibbs sampling."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 rand = "0.8.5"
+clap = { version = "4.3.0", features = ["derive"] }
+serde = { version = "1.0.163", features = ["derive"] }
+toml = "0.7.4"

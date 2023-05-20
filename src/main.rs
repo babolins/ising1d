@@ -1,38 +1,41 @@
+use std::fs;
+use std::path::PathBuf;
+use std::error::Error;
+use std::str::FromStr;
+use clap::Parser;
 use rand::Rng;
 use rand::distributions::Standard;
+use serde::Deserialize;
 
-fn main() {
-    let sites: usize = 1024;
-    let init_iters: usize = 10000;
-    let sample_iters: usize = 100000;
-    let sample_freq: usize = 100;
-    let j = 1.0;
-    let h = 0.0;
-    let beta = 1.0;
-    let j_beta = j / beta;
-    let h_beta = h / beta;
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = Arguments::parse();
+    let config_file = fs::read_to_string(args.config_file)?;
+    let config: Config = toml::from_str(&config_file)?;
     
-    let mut z = vec![1; sites];
-    for _ in 0..init_iters {
-        gibbs_sample(&mut z, j_beta, h_beta, sites);
+    let j_beta = config.coupling / config.beta;
+    let h_beta = config.field / config.beta;
+    
+    let mut z = vec![1; config.sites];
+    for _ in 0..config.init_iters {
+        gibbs_sample(&mut z, j_beta, h_beta, config.sites);
     }
     
     let mut count: usize = 0;
     let mut mean = 0.0;
     let mut variance = 0.0;
-    let mut corr = vec![0.0; sites / 2];
-    for i in 0..sample_iters {
-        gibbs_sample(&mut z, j_beta, h_beta, sites);
+    let mut corr = vec![0.0; config.sites / 2];
+    for i in 0..config.sample_iters {
+        gibbs_sample(&mut z, j_beta, h_beta, config.sites);
 
-        if i % sample_freq == 0 {
+        if i % config.sample_freq == 0 {
             count += 1;
             let m = z.iter().sum::<i32>() as f64;
             let delta = m - mean;
             mean += delta / count as f64;
             variance += delta * (m - mean);
 
-            let temp_corr = correlation(&z, sites);
-            for i in 0..sites / 2 {
+            let temp_corr = correlation(&z, config.sites);
+            for i in 0..config.sites / 2 {
                 let delta = temp_corr[i] - corr[i];
                 corr[i] += delta / count as f64;
             }
@@ -41,7 +44,16 @@ fn main() {
     variance /= (count - 1) as f64;
 
     println!("observations = {count}, M = {mean}, std. dev. = {}", variance.sqrt());
-    println!("{:?}", corr);
+    
+    let mut corr_string = "".to_owned();
+    for (i, value) in corr.iter().enumerate() {
+        corr_string.push_str(&format!("{i:>6} {value:>15.7E}\n"));
+    }
+
+    let correlation_file = config.correlation_file.unwrap_or(PathBuf::from_str("corr.dat").unwrap());
+    fs::write(correlation_file, corr_string)?;
+
+    Ok(())
 }
 
 fn gibbs_sample(z: &mut Vec<i32>, j_beta: f64, h_beta: f64, sites: usize) {
@@ -79,4 +91,22 @@ fn correlation(z: &Vec<i32>, sites: usize) -> Vec<f64> {
         corr.push(m2 / sites as f64);
     }
     corr
+}
+
+#[derive(Deserialize)]
+struct Config {
+    sites: usize,
+    init_iters: u32,
+    sample_iters: u32,
+    sample_freq: u32,
+    coupling: f64,
+    field: f64,
+    beta: f64,
+    correlation_file: Option<PathBuf>
+}
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Arguments {
+    config_file: PathBuf
 }
