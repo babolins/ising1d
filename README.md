@@ -12,7 +12,7 @@ Start a simulation by running the command:
 where input_file.toml is a TOML file containing model parameters. An example
 input file might look like:
 
-    sites = 1024                    # Number of spin sites
+    sites = 1024                    # Number of spin sites, must be >= 3
     init_iters = 10000              # Number of Gibbs samples to draw to burn in the simulation
     sample_iters = 100000           # Number of Gibbs samples to draw during the main simulation
     sample_freq = 100               # During production, how frequently to collect observables
