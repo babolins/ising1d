@@ -18,12 +18,11 @@ input file might look like:
     sample_freq = 100
     coupling = 1.5
     field = 0.0
-    beta = 1.0
 
 which would correspond to a simulation of 1024 ising spins with an interaction
-between sites of J = 1.5, an external electric field strength of h = 0.0 and at
-an inverse temperature beta = 1.0. In this example 10,000 sample configurations
-are drawn using Gibbs sampling and discarded to allow the system to equilibrate
-and then 100,000 samples are subsequently drawn. Of these 100,000 sample
-configurations, every 100 of them are used to estimate the net magnetization of
-the ensemble as well as inter-site correlations.
+between sites of J/kBT = 1.5, an external electric field strength of h/kBT = 0.0. 
+In this example 10,000 sample configurations are drawn using Gibbs sampling and
+discarded to allow the system to equilibrate and then 100,000 samples are
+subsequently drawn. Of these 100,000 sample configurations, every 100 of them
+are used to estimate the net magnetization of the ensemble as well as
+inter-site correlations.

@@ -7,14 +7,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Arguments::parse();
     let config_file = fs::read_to_string(args.config_file)?;
     let config: Config = toml::from_str(&config_file)?;
-    
-    let j_beta = config.coupling / config.beta;
-    let h_beta = config.field / config.beta;
+
+    let j = config.coupling;
+    let h = config.field;
     
     // Spin state of the system, the value 1 = spin up, and the value -1 = spin down.
-    let mut z = vec![1; config.sites];
+    let mut sites = vec![1; config.sites];
+    assert!(sites.len() >= 3);
+    
     for _ in 0..config.init_iters {
-        gibbs_sample(&mut z, j_beta, h_beta, config.sites);
+        gibbs_sample(&mut sites[..], j, h);
     }
     
     let mut count: usize = 0;
@@ -22,19 +24,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut variance = 0.0;
     let mut corr = vec![0.0; config.sites / 2];
     for i in 0..config.sample_iters {
-        gibbs_sample(&mut z, j_beta, h_beta, config.sites);
+        gibbs_sample(&mut sites[..], j, h);
 
         if i % config.sample_freq == 0 {
             // Compute the magnetization of the system and update the mean and variance.
             count += 1;
-            let m = z.iter().sum::<i32>() as f64;
+            let m = sites.iter().sum::<i32>() as f64;
             let delta = m - mean;
             mean += delta / count as f64;
             variance += delta * (m - mean);
 
             // Compute the inter-site correlation and update its average value.
-            let temp_corr = correlation(&z, config.sites);
-            for i in 0..config.sites / 2 {
+            let temp_corr = correlation(&sites);
+            for i in 0..corr.len() {
                 let delta = temp_corr[i] - corr[i];
                 corr[i] += delta / count as f64;
             }
@@ -56,38 +58,38 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Update the state of the system using Gibbs sampling.
-fn gibbs_sample(z: &mut Vec<i32>, j_beta: f64, h_beta: f64, sites: usize) {
-    let p = prob(z[sites - 1], z[1], j_beta, h_beta);
+fn gibbs_sample(sites: &mut [i32], j: f64, h: f64) {
+    let p = prob(sites[sites.len() - 1], sites[1], j, h);
     let u: f64 = rand::thread_rng().sample(Standard);
-    z[0] = if u < p { 1 } else { -1 };
+    sites[0] = if u < p { 1 } else { -1 };
 
-    for i in 1..sites - 1 {
-        let p = prob(z[i - 1], z[i + 1], j_beta, h_beta);
+    for i in 1..sites.len() - 1 {
+        let p = prob(sites[i - 1], sites[i + 1], j, h);
         let u: f64 = rand::thread_rng().sample(Standard);
-        z[i] = if u < p { 1 } else { -1 };
+        sites[i] = if u < p { 1 } else { -1 };
     }
 
-    let p = prob(z[sites - 2], z[0], j_beta, h_beta);
+    let p = prob(sites[sites.len() - 2], sites[0], j, h);
     let u: f64 = rand::thread_rng().sample(Standard);
-    z[sites - 1] = if u < p { 1 } else { -1 };
+    sites[sites.len() - 1] = if u < p { 1 } else { -1 };
 }
 
 /// The probability that a spin is in the spin up state, conditional on the state of its neighbors.
-fn prob(z_m: i32, z_p: i32, j_beta: f64, h_beta: f64) -> f64 {
+fn prob(z_m: i32, z_p: i32, j: f64, h: f64) -> f64 {
     let arg = z_m + z_p;
-    let arg = j_beta * arg as f64 + h_beta;
+    let arg = j * arg as f64 + h;
     arg.exp() / (2.0 * arg.cosh())
 }
 
 /// Compute the expectation value of the inter-site correlation z[i] * z[j] as a function of inter-site
 /// distance |i - j| for distances up to half the size of the periodic box.
-fn correlation(z: &Vec<i32>, sites: usize) -> Vec<f64> {
-    let mut corr: Vec<f64> = Vec::with_capacity(sites / 2);
-    let m2 = z.iter().map(|z| (z * z) as f64).sum::<f64>();
-    corr.push(m2 / sites as f64);
-    for i in 1..sites / 2 {
-        let m2 = (0..sites).map(|j| (z[j] * z[(j + i) % sites]) as f64).sum::<f64>();
-        corr.push(m2 / sites as f64);
+fn correlation(sites: &[i32]) -> Vec<f64> {
+    let mut corr: Vec<f64> = Vec::with_capacity(sites.len() / 2);
+    let m2 = sites.iter().map(|z| (z * z) as f64).sum::<f64>();
+    corr.push(m2 / sites.len() as f64);
+    for i in 1..sites.len() / 2 {
+        let m2 = (0..sites.len()).map(|j| (sites[j] * sites[(j + i) % sites.len()]) as f64).sum::<f64>();
+        corr.push(m2 / sites.len() as f64);
     }
     corr
 }
@@ -100,7 +102,6 @@ struct Config {
     sample_freq: u32,
     coupling: f64,
     field: f64,
-    beta: f64,
     correlation_file: Option<PathBuf>
 }
 
