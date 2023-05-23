@@ -1,5 +1,6 @@
 use clap::Parser;
-use rand::{distributions::Standard, Rng};
+use pcg_rand::Pcg64;
+use rand::{distributions::Standard, Rng, SeedableRng};
 use std::{error::Error, fs, path::PathBuf, str::FromStr};
 use serde::Deserialize;
 
@@ -7,6 +8,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Arguments::parse();
     let config_file = fs::read_to_string(args.config_file)?;
     let config: Config = toml::from_str(&config_file)?;
+
+    let mut rng = match config.seed {
+        Some(seed) => Pcg64::seed_from_u64(seed),
+        None => Pcg64::from_entropy()
+    };
 
     let j = config.coupling;
     let h = config.field;
@@ -16,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert!(sites.len() >= 3);
     
     for _ in 0..config.init_iters {
-        gibbs_sample(&mut sites[..], j, h);
+        gibbs_sample(&mut sites[..], j, h, &mut rng);
     }
     
     let mut count: usize = 0;
@@ -24,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut variance = 0.0;
     let mut corr = vec![0.0; config.sites / 2];
     for i in 0..config.sample_iters {
-        gibbs_sample(&mut sites[..], j, h);
+        gibbs_sample(&mut sites[..], j, h, &mut rng);
 
         if i % config.sample_freq == 0 {
             // Compute the magnetization of the system and update the mean and variance.
@@ -58,19 +64,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Update the state of the system using Gibbs sampling.
-fn gibbs_sample(sites: &mut [i32], j: f64, h: f64) {
+fn gibbs_sample(sites: &mut [i32], j: f64, h: f64, rng: &mut impl Rng) {
     let p = prob(sites[sites.len() - 1], sites[1], j, h);
-    let u: f64 = rand::thread_rng().sample(Standard);
+    let u: f64 = rng.sample(Standard);
     sites[0] = if u < p { 1 } else { -1 };
 
     for i in 1..sites.len() - 1 {
         let p = prob(sites[i - 1], sites[i + 1], j, h);
-        let u: f64 = rand::thread_rng().sample(Standard);
+        let u: f64 = rng.sample(Standard);
         sites[i] = if u < p { 1 } else { -1 };
     }
 
     let p = prob(sites[sites.len() - 2], sites[0], j, h);
-    let u: f64 = rand::thread_rng().sample(Standard);
+    let u: f64 = rng.sample(Standard);
     sites[sites.len() - 1] = if u < p { 1 } else { -1 };
 }
 
@@ -102,7 +108,8 @@ struct Config {
     sample_freq: u32,
     coupling: f64,
     field: f64,
-    correlation_file: Option<PathBuf>
+    correlation_file: Option<PathBuf>,
+    seed: Option<u64>
 }
 
 #[derive(Parser)]

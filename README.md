@@ -12,17 +12,11 @@ Start a simulation by running the command:
 where input_file.toml is a TOML file containing model parameters. An example
 input file might look like:
 
-    sites = 1024
-    init_iters = 10000
-    sample_iters = 100000
-    sample_freq = 100
-    coupling = 1.5
-    field = 0.0
-
-which would correspond to a simulation of 1024 ising spins with an interaction
-between sites of J/kBT = 1.5, an external electric field strength of h/kBT = 0.0. 
-In this example 10,000 sample configurations are drawn using Gibbs sampling and
-discarded to allow the system to equilibrate and then 100,000 samples are
-subsequently drawn. Of these 100,000 sample configurations, every 100 of them
-are used to estimate the net magnetization of the ensemble as well as
-inter-site correlations.
+    sites = 1024                    # Number of spin sites
+    init_iters = 10000              # Number of Gibbs samples to draw to burn in the simulation
+    sample_iters = 100000           # Number of Gibbs samples to draw during the main simulation
+    sample_freq = 100               # During production, how frequently to collect observables
+    coupling = 1.5                  # Spin-spin interaction strength, J / kB*T
+    field = 0.0                     # Magnetic field strength, h / kB*T
+    correlation_file = "corr.dat"   # Output file for inter-site correlations
+    seed = 42                       # Random seed, for reproducibility. Omit to generate a seed randomly
